@@ -27,6 +27,10 @@ GRID_OFFSET_Y   = (SCREEN_HEIGHT - GRID_PIXEL_SIZE) // 2
 MARK_WIDTH   = 6
 MARK_PADDING = 20
 
+    # --- Win Line
+WIN_LINE_COLOR = (255, 215,   0)
+WIN_LINE_WIDTH = 8
+
     # --- Colors
 BLACK      = (0,   0,   0)
 WHITE      = (255, 255, 255)
@@ -78,6 +82,32 @@ def processing_place_mark(board, row, col, current_player):
 def processing_switch_turn(current_player):
     return "O" if current_player == "X" else "X"
 
+def processing_check_winner(board):
+    lines = [
+        [(0,0), (0,1), (0,2)],
+        [(1,0), (1,1), (1,2)],
+        [(2,0), (2,1), (2,2)],
+        [(0,0), (1,0), (2,0)],
+        [(0,1), (1,1), (2,1)],
+        [(0,2), (1,2), (2,2)],
+        [(0,0), (1,1), (2,2)],
+        [(0,2), (1,1), (2,0)],
+    ]
+    for line in lines:
+        marks = [board[r][c] for r, c in line]
+        if marks[0] is not None and marks[0] == marks[1] == marks[2]:
+            return marks[0], line
+    return None, None
+
+def processing_win_line_coords(winning_cells):
+    r1, c1 = winning_cells[0]
+    r2, c2 = winning_cells[-1]
+    start = (GRID_OFFSET_X + c1 * CELL_SIZE + CELL_SIZE // 2,
+             GRID_OFFSET_Y + r1 * CELL_SIZE + CELL_SIZE // 2)
+    end   = (GRID_OFFSET_X + c2 * CELL_SIZE + CELL_SIZE // 2,
+             GRID_OFFSET_Y + r2 * CELL_SIZE + CELL_SIZE // 2)
+    return start, end
+
 
 # ================================================================
 # MAIN
@@ -91,6 +121,8 @@ def main():
 
     board          = processing_board_init()
     current_player = "X"
+    winner         = None
+    winning_cells  = None
 
     while True:
         events = pygame.event.get()
@@ -99,14 +131,17 @@ def main():
             pygame.quit()
             sys.exit()
 
-        mouse_pos = handling_cell_click(events)
-        if mouse_pos is not None:
-            cell = processing_cell_from_click(mouse_pos)
-            if cell is not None:
-                row, col = cell
-                placed = processing_place_mark(board, row, col, current_player)
-                if placed:
-                    current_player = processing_switch_turn(current_player)
+        if winner is None:
+            mouse_pos = handling_cell_click(events)
+            if mouse_pos is not None:
+                cell = processing_cell_from_click(mouse_pos)
+                if cell is not None:
+                    row, col = cell
+                    placed = processing_place_mark(board, row, col, current_player)
+                    if placed:
+                        winner, winning_cells = processing_check_winner(board)
+                        if winner is None:
+                            current_player = processing_switch_turn(current_player)
 
         screen.fill(BLACK)
 
@@ -122,13 +157,13 @@ def main():
 
         for row in range(GRID_SIZE):
             for col in range(GRID_SIZE):
-                mark  = board[row][col]
-                x     = GRID_OFFSET_X + col * CELL_SIZE
-                y     = GRID_OFFSET_Y + row * CELL_SIZE
+                mark = board[row][col]
+                x    = GRID_OFFSET_X + col * CELL_SIZE
+                y    = GRID_OFFSET_Y + row * CELL_SIZE
 
                 if mark == "X":
                     pygame.draw.line(screen, X_COLOR,
-                                     (x + MARK_PADDING,            y + MARK_PADDING),
+                                     (x + MARK_PADDING,             y + MARK_PADDING),
                                      (x + CELL_SIZE - MARK_PADDING, y + CELL_SIZE - MARK_PADDING),
                                      MARK_WIDTH)
                     pygame.draw.line(screen, X_COLOR,
@@ -140,6 +175,10 @@ def main():
                     center = (x + CELL_SIZE // 2, y + CELL_SIZE // 2)
                     radius = CELL_SIZE // 2 - MARK_PADDING
                     pygame.draw.circle(screen, O_COLOR, center, radius, MARK_WIDTH)
+
+        if winning_cells is not None:
+            start, end = processing_win_line_coords(winning_cells)
+            pygame.draw.line(screen, WIN_LINE_COLOR, start, end, WIN_LINE_WIDTH)
 
         pygame.display.flip()
         clock.tick(FPS)
