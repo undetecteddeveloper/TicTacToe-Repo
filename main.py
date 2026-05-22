@@ -15,6 +15,13 @@ SCREEN_HEIGHT = 600
 FPS           = 60
 TITLE         = "Tic-Tac-Toe"
 
+    # --- Game States
+GAME_MENU    = 0
+GAME_RUNNING = 1
+GAME_ACTION  = 2
+GAME_PAUSE   = 3
+EXIT         = 4
+
     # --- Grid
 GRID_SIZE       = 3
 GRID_PIXEL_SIZE = 350
@@ -51,11 +58,33 @@ def handling_quit(events):
             return True
     return False
 
-def handling_cell_click(events):
+def handling_menu(events):
+    for event in events:
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+            return True
+    return False
+
+def handling_running(events):
+    click_pos     = None
+    pause_pressed = False
     for event in events:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            return event.pos
-    return None
+            click_pos = event.pos
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            pause_pressed = True
+    return click_pos, pause_pressed
+
+def handling_action(events):
+    for event in events:
+        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
+            return True
+    return False
+
+def handling_pause(events):
+    for event in events:
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            return True
+    return False
 
 
     # --- Processing Functions (Model)
@@ -67,8 +96,8 @@ def processing_board_init():
 
 def processing_cell_from_click(mouse_pos):
     x, y = mouse_pos
-    col = (x - GRID_OFFSET_X) // CELL_SIZE
-    row = (y - GRID_OFFSET_Y) // CELL_SIZE
+    col  = (x - GRID_OFFSET_X) // CELL_SIZE
+    row  = (y - GRID_OFFSET_Y) // CELL_SIZE
     if 0 <= row < GRID_SIZE and 0 <= col < GRID_SIZE:
         return row, col
     return None
@@ -102,11 +131,48 @@ def processing_check_winner(board):
 def processing_win_line_coords(winning_cells):
     r1, c1 = winning_cells[0]
     r2, c2 = winning_cells[-1]
-    start = (GRID_OFFSET_X + c1 * CELL_SIZE + CELL_SIZE // 2,
-             GRID_OFFSET_Y + r1 * CELL_SIZE + CELL_SIZE // 2)
-    end   = (GRID_OFFSET_X + c2 * CELL_SIZE + CELL_SIZE // 2,
-             GRID_OFFSET_Y + r2 * CELL_SIZE + CELL_SIZE // 2)
+    start  = (GRID_OFFSET_X + c1 * CELL_SIZE + CELL_SIZE // 2,
+              GRID_OFFSET_Y + r1 * CELL_SIZE + CELL_SIZE // 2)
+    end    = (GRID_OFFSET_X + c2 * CELL_SIZE + CELL_SIZE // 2,
+              GRID_OFFSET_Y + r2 * CELL_SIZE + CELL_SIZE // 2)
     return start, end
+
+def processing_menu(started):
+    if started:
+        return GAME_RUNNING
+    return GAME_MENU
+
+def processing_running(click_pos, pause_pressed, board, current_player):
+    if pause_pressed:
+        return GAME_PAUSE, current_player, None, None
+
+    if click_pos is None:
+        return GAME_RUNNING, current_player, None, None
+
+    cell = processing_cell_from_click(click_pos)
+    if cell is None:
+        return GAME_RUNNING, current_player, None, None
+
+    row, col = cell
+    placed   = processing_place_mark(board, row, col, current_player)
+    if not placed:
+        return GAME_RUNNING, current_player, None, None
+
+    winner, winning_cells = processing_check_winner(board)
+    if winner is not None:
+        return GAME_ACTION, current_player, winner, winning_cells
+
+    return GAME_RUNNING, processing_switch_turn(current_player), None, None
+
+def processing_action(confirmed):
+    if confirmed:
+        return GAME_RUNNING
+    return GAME_ACTION
+
+def processing_pause(resume):
+    if resume:
+        return GAME_RUNNING
+    return GAME_PAUSE
 
 
 # ================================================================
@@ -117,12 +183,14 @@ def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(TITLE)
-    clock = pygame.time.Clock()
+    clock  = pygame.time.Clock()
+    font   = pygame.font.SysFont("arial", 36)
 
     board          = processing_board_init()
     current_player = "X"
     winner         = None
     winning_cells  = None
+    game_state     = GAME_MENU
 
     while True:
         events = pygame.event.get()
@@ -131,54 +199,83 @@ def main():
             pygame.quit()
             sys.exit()
 
-        if winner is None:
-            mouse_pos = handling_cell_click(events)
-            if mouse_pos is not None:
-                cell = processing_cell_from_click(mouse_pos)
-                if cell is not None:
-                    row, col = cell
-                    placed = processing_place_mark(board, row, col, current_player)
-                    if placed:
-                        winner, winning_cells = processing_check_winner(board)
-                        if winner is None:
-                            current_player = processing_switch_turn(current_player)
+        if game_state == GAME_MENU:
+            started    = handling_menu(events)
+            game_state = processing_menu(started)
 
+        elif game_state == GAME_RUNNING:
+            click_pos, pause_pressed                          = handling_running(events)
+            game_state, current_player, winner, winning_cells = processing_running(
+                click_pos, pause_pressed, board, current_player
+            )
+
+        elif game_state == GAME_ACTION:
+            confirmed  = handling_action(events)
+            game_state = processing_action(confirmed)
+            if game_state == GAME_RUNNING:
+                board          = processing_board_init()
+                current_player = "X"
+                winner         = None
+                winning_cells  = None
+
+        elif game_state == GAME_PAUSE:
+            resume     = handling_pause(events)
+            game_state = processing_pause(resume)
+
+        elif game_state == EXIT:
+            pygame.quit()
+            sys.exit()
+
+        # View
         screen.fill(BLACK)
 
-        for i in range(1, GRID_SIZE):
-            pygame.draw.line(screen, GRID_COLOR,
-                             (GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y),
-                             (GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y + GRID_PIXEL_SIZE),
-                             LINE_WIDTH)
-            pygame.draw.line(screen, GRID_COLOR,
-                             (GRID_OFFSET_X, GRID_OFFSET_Y + i * CELL_SIZE),
-                             (GRID_OFFSET_X + GRID_PIXEL_SIZE, GRID_OFFSET_Y + i * CELL_SIZE),
-                             LINE_WIDTH)
+        if game_state in (GAME_RUNNING, GAME_ACTION, GAME_PAUSE):
+            for i in range(1, GRID_SIZE):
+                pygame.draw.line(screen, GRID_COLOR,
+                                 (GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y),
+                                 (GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y + GRID_PIXEL_SIZE),
+                                 LINE_WIDTH)
+                pygame.draw.line(screen, GRID_COLOR,
+                                 (GRID_OFFSET_X, GRID_OFFSET_Y + i * CELL_SIZE),
+                                 (GRID_OFFSET_X + GRID_PIXEL_SIZE, GRID_OFFSET_Y + i * CELL_SIZE),
+                                 LINE_WIDTH)
 
-        for row in range(GRID_SIZE):
-            for col in range(GRID_SIZE):
-                mark = board[row][col]
-                x    = GRID_OFFSET_X + col * CELL_SIZE
-                y    = GRID_OFFSET_Y + row * CELL_SIZE
+            for row in range(GRID_SIZE):
+                for col in range(GRID_SIZE):
+                    mark = board[row][col]
+                    x    = GRID_OFFSET_X + col * CELL_SIZE
+                    y    = GRID_OFFSET_Y + row * CELL_SIZE
 
-                if mark == "X":
-                    pygame.draw.line(screen, X_COLOR,
-                                     (x + MARK_PADDING,             y + MARK_PADDING),
-                                     (x + CELL_SIZE - MARK_PADDING, y + CELL_SIZE - MARK_PADDING),
-                                     MARK_WIDTH)
-                    pygame.draw.line(screen, X_COLOR,
-                                     (x + CELL_SIZE - MARK_PADDING, y + MARK_PADDING),
-                                     (x + MARK_PADDING,             y + CELL_SIZE - MARK_PADDING),
-                                     MARK_WIDTH)
+                    if mark == "X":
+                        pygame.draw.line(screen, X_COLOR,
+                                         (x + MARK_PADDING,             y + MARK_PADDING),
+                                         (x + CELL_SIZE - MARK_PADDING, y + CELL_SIZE - MARK_PADDING),
+                                         MARK_WIDTH)
+                        pygame.draw.line(screen, X_COLOR,
+                                         (x + CELL_SIZE - MARK_PADDING, y + MARK_PADDING),
+                                         (x + MARK_PADDING,             y + CELL_SIZE - MARK_PADDING),
+                                         MARK_WIDTH)
 
-                elif mark == "O":
-                    center = (x + CELL_SIZE // 2, y + CELL_SIZE // 2)
-                    radius = CELL_SIZE // 2 - MARK_PADDING
-                    pygame.draw.circle(screen, O_COLOR, center, radius, MARK_WIDTH)
+                    elif mark == "O":
+                        center = (x + CELL_SIZE // 2, y + CELL_SIZE // 2)
+                        radius = CELL_SIZE // 2 - MARK_PADDING
+                        pygame.draw.circle(screen, O_COLOR, center, radius, MARK_WIDTH)
 
-        if winning_cells is not None:
-            start, end = processing_win_line_coords(winning_cells)
-            pygame.draw.line(screen, WIN_LINE_COLOR, start, end, WIN_LINE_WIDTH)
+            if winning_cells is not None:
+                start, end = processing_win_line_coords(winning_cells)
+                pygame.draw.line(screen, WIN_LINE_COLOR, start, end, WIN_LINE_WIDTH)
+
+        if game_state == GAME_MENU:
+            text = font.render("Press any key to start", True, WHITE)
+            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+
+        elif game_state == GAME_ACTION:
+            text = font.render("Click to restart", True, WHITE)
+            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, GRID_OFFSET_Y - 30)))
+
+        elif game_state == GAME_PAUSE:
+            text = font.render("PAUSED  -  ESC to resume", True, WHITE)
+            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
 
         pygame.display.flip()
         clock.tick(FPS)
