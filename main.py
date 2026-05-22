@@ -20,7 +20,8 @@ GAME_MENU    = 0
 GAME_RUNNING = 1
 GAME_ACTION  = 2
 GAME_PAUSE   = 3
-EXIT         = 4
+GAME_DRAW    = 4
+EXIT         = 5
 
     # --- Grid
 GRID_SIZE       = 3
@@ -37,6 +38,10 @@ MARK_PADDING = 20
     # --- Win Line
 WIN_LINE_COLOR = (255, 215,   0)
 WIN_LINE_WIDTH = 8
+
+    # --- Fonts
+FONT_SIZE       = 32
+SCORE_FONT_SIZE = 48
 
     # --- Colors
 BLACK      = (0,   0,   0)
@@ -137,6 +142,19 @@ def processing_win_line_coords(winning_cells):
               GRID_OFFSET_Y + r2 * CELL_SIZE + CELL_SIZE // 2)
     return start, end
 
+def processing_is_draw(board):
+    for row in board:
+        if None in row:
+            return False
+    return True
+
+def processing_update_score(score_x, score_o, winner):
+    if winner == "X":
+        score_x += 1
+    elif winner == "O":
+        score_o += 1
+    return score_x, score_o
+
 def processing_menu(started):
     if started:
         return GAME_RUNNING
@@ -162,6 +180,9 @@ def processing_running(click_pos, pause_pressed, board, current_player):
     if winner is not None:
         return GAME_ACTION, current_player, winner, winning_cells
 
+    if processing_is_draw(board):
+        return GAME_DRAW, "X", None, None
+
     return GAME_RUNNING, processing_switch_turn(current_player), None, None
 
 def processing_action(confirmed):
@@ -181,15 +202,18 @@ def processing_pause(resume):
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    screen     = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(TITLE)
-    clock  = pygame.time.Clock()
-    font   = pygame.font.SysFont("arial", 36)
+    clock      = pygame.time.Clock()
+    font       = pygame.font.SysFont("arial", FONT_SIZE)
+    score_font = pygame.font.SysFont("arial", SCORE_FONT_SIZE)
 
     board          = processing_board_init()
     current_player = "X"
     winner         = None
     winning_cells  = None
+    score_x        = 0
+    score_o        = 0
     game_state     = GAME_MENU
 
     while True:
@@ -208,6 +232,12 @@ def main():
             game_state, current_player, winner, winning_cells = processing_running(
                 click_pos, pause_pressed, board, current_player
             )
+            if game_state == GAME_ACTION:
+                score_x, score_o = processing_update_score(score_x, score_o, winner)
+            elif game_state == GAME_DRAW:
+                board          = processing_board_init()
+                current_player = "X"
+                game_state     = GAME_RUNNING
 
         elif game_state == GAME_ACTION:
             confirmed  = handling_action(events)
@@ -230,6 +260,19 @@ def main():
         screen.fill(BLACK)
 
         if game_state in (GAME_RUNNING, GAME_ACTION, GAME_PAUSE):
+            score_y_label = GRID_OFFSET_Y // 2 - SCORE_FONT_SIZE // 2 + 4
+            score_y_num   = GRID_OFFSET_Y // 2 + FONT_SIZE  // 2 + 4
+
+            x_label = font.render("Red Player",  True, WHITE)
+            o_label = font.render("Blue Player", True, WHITE)
+            x_score = score_font.render(str(score_x), True, X_COLOR)
+            o_score = score_font.render(str(score_o), True, O_COLOR)
+
+            screen.blit(x_label, x_label.get_rect(center=(SCREEN_WIDTH // 4,     score_y_label)))
+            screen.blit(o_label, o_label.get_rect(center=(SCREEN_WIDTH * 3 // 4, score_y_label)))
+            screen.blit(x_score, x_score.get_rect(center=(SCREEN_WIDTH // 4,     score_y_num)))
+            screen.blit(o_score, o_score.get_rect(center=(SCREEN_WIDTH * 3 // 4, score_y_num)))
+
             for i in range(1, GRID_SIZE):
                 pygame.draw.line(screen, GRID_COLOR,
                                  (GRID_OFFSET_X + i * CELL_SIZE, GRID_OFFSET_Y),
@@ -271,7 +314,9 @@ def main():
 
         elif game_state == GAME_ACTION:
             text = font.render("Click to restart", True, WHITE)
-            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, GRID_OFFSET_Y - 30)))
+            screen.blit(text, text.get_rect(
+                center=(SCREEN_WIDTH // 2, GRID_OFFSET_Y + GRID_PIXEL_SIZE + 30)
+            ))
 
         elif game_state == GAME_PAUSE:
             text = font.render("PAUSED  -  ESC to resume", True, WHITE)
