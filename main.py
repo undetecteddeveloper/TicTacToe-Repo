@@ -16,12 +16,13 @@ FPS           = 60
 TITLE         = "Tic-Tac-Toe"
 
     # --- Game States
-GAME_MENU    = 0
-GAME_RUNNING = 1
-GAME_ACTION  = 2
-GAME_PAUSE   = 3
-GAME_DRAW    = 4
-EXIT         = 5
+GAME_MENU         = 0
+GAME_RUNNING      = 1
+GAME_ACTION       = 2
+GAME_PAUSE        = 3
+GAME_DRAW         = 4
+EXIT              = 5
+DRAW_DISPLAY_TIME = 2000
 
     # --- Grid
 GRID_SIZE       = 3
@@ -195,6 +196,11 @@ def processing_pause(resume):
         return GAME_RUNNING
     return GAME_PAUSE
 
+def processing_draw(draw_start_time):
+    if pygame.time.get_ticks() - draw_start_time >= DRAW_DISPLAY_TIME:
+        return GAME_RUNNING
+    return GAME_DRAW
+
 
 # ================================================================
 # MAIN
@@ -208,13 +214,14 @@ def main():
     font       = pygame.font.SysFont("arial", FONT_SIZE)
     score_font = pygame.font.SysFont("arial", SCORE_FONT_SIZE)
 
-    board          = processing_board_init()
-    current_player = "X"
-    winner         = None
-    winning_cells  = None
-    score_x        = 0
-    score_o        = 0
-    game_state     = GAME_MENU
+    board           = processing_board_init()
+    current_player  = "X"
+    winner          = None
+    winning_cells   = None
+    score_x         = 0
+    score_o         = 0
+    game_state      = GAME_MENU
+    draw_start_time = 0
 
     while True:
         events = pygame.event.get()
@@ -235,9 +242,7 @@ def main():
             if game_state == GAME_ACTION:
                 score_x, score_o = processing_update_score(score_x, score_o, winner)
             elif game_state == GAME_DRAW:
-                board          = processing_board_init()
-                current_player = "X"
-                game_state     = GAME_RUNNING
+                draw_start_time = pygame.time.get_ticks()
 
         elif game_state == GAME_ACTION:
             confirmed  = handling_action(events)
@@ -252,6 +257,12 @@ def main():
             resume     = handling_pause(events)
             game_state = processing_pause(resume)
 
+        elif game_state == GAME_DRAW:
+            game_state = processing_draw(draw_start_time)
+            if game_state == GAME_RUNNING:
+                board          = processing_board_init()
+                current_player = "X"
+
         elif game_state == EXIT:
             pygame.quit()
             sys.exit()
@@ -259,7 +270,7 @@ def main():
         # View
         screen.fill(BLACK)
 
-        if game_state in (GAME_RUNNING, GAME_ACTION, GAME_PAUSE):
+        if game_state in (GAME_RUNNING, GAME_ACTION, GAME_PAUSE, GAME_DRAW):
             score_y_label = GRID_OFFSET_Y // 2 - SCORE_FONT_SIZE // 2 + 4
             score_y_num   = GRID_OFFSET_Y // 2 + FONT_SIZE  // 2 + 4
 
@@ -321,6 +332,10 @@ def main():
         elif game_state == GAME_PAUSE:
             text = font.render("PAUSED  -  ESC to resume", True, WHITE)
             screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+
+        elif game_state == GAME_DRAW:
+            text = font.render("Draw", True, WHITE)
+            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, GRID_OFFSET_Y + FONT_SIZE // 2 + 5)))
 
         pygame.display.flip()
         clock.tick(FPS)
