@@ -3,6 +3,7 @@
 # ================================================================
 import pygame
 import sys
+import os
 
 
 # ================================================================
@@ -16,13 +17,16 @@ FPS           = 60
 TITLE         = "Tic-Tac-Toe"
 
     # --- Game States
-GAME_MENU         = 0
-GAME_RUNNING      = 1
-GAME_ACTION       = 2
-GAME_PAUSE        = 3
-GAME_DRAW         = 4
-EXIT              = 5
+GAME_MENU    = 0
+GAME_RUNNING = 1
+GAME_ACTION  = 2
+GAME_PAUSE   = 3
+GAME_DRAW    = 4
+EXIT         = 5
+
+    # --- Timing
 DRAW_DISPLAY_TIME = 2000
+FLASH_INTERVAL    =  600
 
     # --- Grid
 GRID_SIZE       = 3
@@ -41,8 +45,9 @@ WIN_LINE_COLOR = (255, 215,   0)
 WIN_LINE_WIDTH = 8
 
     # --- Fonts
-FONT_SIZE       = 32
-SCORE_FONT_SIZE = 48
+FONT_SIZE            = 32
+SCORE_FONT_SIZE      = 48
+MENU_TITLE_FONT_SIZE = 52
 
     # --- Colors
 BLACK      = (0,   0,   0)
@@ -50,6 +55,13 @@ WHITE      = (255, 255, 255)
 GRID_COLOR = (200, 200, 200)
 X_COLOR    = (255,  80,  80)
 O_COLOR    = ( 80,  80, 255)
+
+    # --- Menu
+MENU_TITLE_Y  = 130
+MENU_ICON_SIZE = 100
+MENU_ICON_GAP  =  50
+MENU_ICON_Y    = 240
+MENU_TEXT_Y    = 410
 
 
 # ================================================================
@@ -201,6 +213,9 @@ def processing_draw(draw_start_time):
         return GAME_RUNNING
     return GAME_DRAW
 
+def processing_flash_text(interval):
+    return (pygame.time.get_ticks() // interval) % 2 == 0
+
 
 # ================================================================
 # MAIN
@@ -213,6 +228,15 @@ def main():
     clock      = pygame.time.Clock()
     font       = pygame.font.SysFont("arial", FONT_SIZE)
     score_font = pygame.font.SysFont("arial", SCORE_FONT_SIZE)
+    menu_font  = pygame.font.SysFont("arial", MENU_TITLE_FONT_SIZE, bold=True)
+
+    img_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "image")
+    icon1   = pygame.transform.scale(
+                  pygame.image.load(os.path.join(img_dir, "cờ_caro_icon.png")).convert_alpha(),
+                  (MENU_ICON_SIZE, MENU_ICON_SIZE))
+    icon2   = pygame.transform.scale(
+                  pygame.image.load(os.path.join(img_dir, "ClaudeCode_logo.png")).convert_alpha(),
+                  (MENU_ICON_SIZE, MENU_ICON_SIZE))
 
     board           = processing_board_init()
     current_player  = "X"
@@ -320,8 +344,17 @@ def main():
                 pygame.draw.line(screen, WIN_LINE_COLOR, start, end, WIN_LINE_WIDTH)
 
         if game_state == GAME_MENU:
-            text = font.render("Press any key to start", True, WHITE)
-            screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)))
+            title = menu_font.render("Caro Chess", True, WHITE)
+            screen.blit(title, title.get_rect(center=(SCREEN_WIDTH // 2, MENU_TITLE_Y)))
+
+            icon1_x = SCREEN_WIDTH // 2 - MENU_ICON_SIZE - MENU_ICON_GAP // 2
+            icon2_x = SCREEN_WIDTH // 2 + MENU_ICON_GAP // 2
+            screen.blit(icon1, (icon1_x, MENU_ICON_Y))
+            screen.blit(icon2, (icon2_x, MENU_ICON_Y))
+
+            if processing_flash_text(FLASH_INTERVAL):
+                text = font.render("Press any keys to play", True, WHITE)
+                screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, MENU_TEXT_Y)))
 
         elif game_state == GAME_ACTION:
             text = font.render("Click to restart", True, WHITE)
