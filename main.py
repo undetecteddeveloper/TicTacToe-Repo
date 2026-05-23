@@ -115,9 +115,12 @@ def handling_running(events):
 
 def handling_action(events):
     for event in events:
-        if event.type in (pygame.MOUSEBUTTONDOWN, pygame.KEYDOWN):
-            return True
-    return False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                return "stay"
+            elif event.key == pygame.K_q:
+                return "menu"
+    return None
 
 def handling_pause(events):
     for event in events:
@@ -247,9 +250,11 @@ def processing_running(click_pos, pause_pressed, board, current_player):
 
     return GAME_RUNNING, processing_switch_turn(current_player), None, None
 
-def processing_action(confirmed):
-    if confirmed:
+def processing_action(action):
+    if action == "stay":
         return GAME_RUNNING
+    if action == "menu":
+        return GAME_MENU
     return GAME_ACTION
 
 def processing_pause(resume):
@@ -298,6 +303,8 @@ def processing_setting(clicked_field, clicked_outside, clicked_checkbox, clicked
 
 def main():
     pygame.init()
+    _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "image", "cờ_caro_icon.png")
+    pygame.display.set_icon(pygame.image.load(_icon_path))
     screen     = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(TITLE)
     clock      = pygame.time.Clock()
@@ -363,17 +370,19 @@ def main():
                 draw_start_time = pygame.time.get_ticks()
 
         elif game_state == GAME_ACTION:
-            confirmed  = handling_action(events)
-            game_state = processing_action(confirmed)
-            if game_state == GAME_RUNNING:
+            action     = handling_action(events)
+            game_state = processing_action(action)
+            if game_state in (GAME_RUNNING, GAME_MENU):
                 board          = processing_board_init()
                 current_player = "X"
                 winner         = None
                 winning_cells  = None
-                if score_x >= win_score or score_o >= win_score:
-                    score_x    = 0
-                    score_o    = 0
-                    game_state = GAME_MENU
+            if game_state == GAME_RUNNING and (score_x >= win_score or score_o >= win_score):
+                score_x = 0
+                score_o = 0
+            if game_state == GAME_MENU:
+                score_x = 0
+                score_o = 0
 
         elif game_state == GAME_PAUSE:
             resume     = handling_pause(events)
@@ -461,11 +470,11 @@ def main():
             screen.blit(icon2, (icon2_x, MENU_ICON_Y))
 
             if processing_flash_text(FLASH_INTERVAL):
-                text = font.render("Press any keys to play", True, WHITE)
+                text = font.render("Press any keys to play (Press S to open Setting)", True, WHITE)
                 screen.blit(text, text.get_rect(center=(SCREEN_WIDTH // 2, MENU_TEXT_Y)))
 
         elif game_state == GAME_ACTION:
-            text = font.render("Click to restart", True, WHITE)
+            text = font.render("SPACE to play again  |  Q to return to menu", True, WHITE)
             screen.blit(text, text.get_rect(
                 center=(SCREEN_WIDTH // 2, GRID_OFFSET_Y + GRID_PIXEL_SIZE + 30)
             ))
