@@ -376,10 +376,10 @@ def main():
     show_fps        = False
     setting_input   = str(DEFAULT_WIN_SCORE)
     setting_active  = False
+    prev_state      = None
 
     while True:
         events      = pygame.event.get()
-        prev_state  = game_state
         mark_placed = False
 
         if handling_quit(events):
@@ -445,6 +445,7 @@ def main():
             prev_state, game_state, mark_placed, score_x, score_o, win_score)
         processing_sound(play_marking, start_music, stop_music, play_winning, stop_winning,
                          marking_sfx, winning_sfx)
+        prev_state = game_state
 
         # View
         screen.fill(BLACK)
