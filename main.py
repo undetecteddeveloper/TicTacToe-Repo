@@ -154,6 +154,15 @@ def handling_setting(events, field_rect, cb_rect, btn_rect):
                 typed_text += event.unicode
     return clicked_field, clicked_outside, clicked_checkbox, clicked_btn, typed_text, pressed_backspace
 
+def handling_sound(prev_state, new_state, mark_placed, score_x, score_o, win_score):
+    play_marking = mark_placed
+    start_music  = (new_state == GAME_MENU and prev_state in (None, GAME_ACTION))
+    stop_music   = (new_state == GAME_ACTION and prev_state != GAME_ACTION)
+    play_winning = (new_state == GAME_ACTION and prev_state != GAME_ACTION
+                    and (score_x >= win_score or score_o >= win_score))
+    stop_winning = (prev_state == GAME_ACTION and new_state != GAME_ACTION)
+    return play_marking, start_music, stop_music, play_winning, stop_winning
+
 
     # --- Processing Functions (Model)
 
@@ -226,29 +235,31 @@ def processing_menu(started, open_settings):
     return GAME_MENU
 
 def processing_running(click_pos, pause_pressed, board, current_player):
+    mark_placed = False
     if pause_pressed:
-        return GAME_PAUSE, current_player, None, None
+        return GAME_PAUSE, current_player, None, None, mark_placed
 
     if click_pos is None:
-        return GAME_RUNNING, current_player, None, None
+        return GAME_RUNNING, current_player, None, None, mark_placed
 
     cell = processing_cell_from_click(click_pos)
     if cell is None:
-        return GAME_RUNNING, current_player, None, None
+        return GAME_RUNNING, current_player, None, None, mark_placed
 
     row, col = cell
     placed   = processing_place_mark(board, row, col, current_player)
     if not placed:
-        return GAME_RUNNING, current_player, None, None
+        return GAME_RUNNING, current_player, None, None, mark_placed
 
+    mark_placed = True
     winner, winning_cells = processing_check_winner(board)
     if winner is not None:
-        return GAME_ACTION, current_player, winner, winning_cells
+        return GAME_ACTION, current_player, winner, winning_cells, mark_placed
 
     if processing_is_draw(board):
-        return GAME_DRAW, "X", None, None
+        return GAME_DRAW, "X", None, None, mark_placed
 
-    return GAME_RUNNING, processing_switch_turn(current_player), None, None
+    return GAME_RUNNING, processing_switch_turn(current_player), None, None, mark_placed
 
 def processing_action(action):
     if action == "stay":
@@ -296,6 +307,19 @@ def processing_setting(clicked_field, clicked_outside, clicked_checkbox, clicked
 
     return GAME_SETTING, setting_input, setting_active, win_score, show_fps
 
+def processing_sound(play_marking, start_music, stop_music, play_winning, stop_winning,
+                     marking_sfx, winning_sfx):
+    if play_marking:
+        marking_sfx.play()
+    if stop_music:
+        pygame.mixer.music.stop()
+    if start_music:
+        pygame.mixer.music.play(-1)
+    if play_winning:
+        winning_sfx.play(-1)
+    if stop_winning:
+        winning_sfx.stop()
+
 
 # ================================================================
 # MAIN
@@ -324,6 +348,11 @@ def main():
     dim_overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
     dim_overlay.fill((0, 0, 0, 160))
 
+    snd_dir     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "sounds")
+    marking_sfx = pygame.mixer.Sound(os.path.join(snd_dir, "marking_SFX.wav"))
+    winning_sfx = pygame.mixer.Sound(os.path.join(snd_dir, "winning_SFX.wav"))
+    pygame.mixer.music.load(os.path.join(snd_dir, "background_music.wav"))
+
     setting_box_x    = (SCREEN_WIDTH  - SETTING_BOX_W) // 2
     setting_box_y    = (SCREEN_HEIGHT - SETTING_BOX_H) // 2
     setting_field_rect = pygame.Rect(
@@ -349,7 +378,9 @@ def main():
     setting_active  = False
 
     while True:
-        events = pygame.event.get()
+        events      = pygame.event.get()
+        prev_state  = game_state
+        mark_placed = False
 
         if handling_quit(events):
             pygame.quit()
@@ -360,8 +391,8 @@ def main():
             game_state = processing_menu(started, open_settings)
 
         elif game_state == GAME_RUNNING:
-            click_pos, pause_pressed                          = handling_running(events)
-            game_state, current_player, winner, winning_cells = processing_running(
+            click_pos, pause_pressed                                       = handling_running(events)
+            game_state, current_player, winner, winning_cells, mark_placed = processing_running(
                 click_pos, pause_pressed, board, current_player
             )
             if game_state == GAME_ACTION:
@@ -407,6 +438,13 @@ def main():
         elif game_state == EXIT:
             pygame.quit()
             sys.exit()
+
+        # Sound
+        (play_marking, start_music, stop_music,
+         play_winning, stop_winning) = handling_sound(
+            prev_state, game_state, mark_placed, score_x, score_o, win_score)
+        processing_sound(play_marking, start_music, stop_music, play_winning, stop_winning,
+                         marking_sfx, winning_sfx)
 
         # View
         screen.fill(BLACK)

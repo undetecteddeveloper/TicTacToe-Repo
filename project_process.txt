@@ -1,0 +1,13 @@
+CoCaro Project - Process Log
+==============================
+
+[2026-05-23] Status: Nearly complete
+- Core gameplay, UI states, scoring, and settings are all implemented.
+
+[2026-05-26] Status: Sound added
+- marking_SFX.wav: plays on every successful cell mark.
+- background_music.wav: loops from GAME_MENU through gameplay; stops on GAME_ACTION; restarts when returning to GAME_MENU from GAME_ACTION.
+- winning_SFX.wav: loops when a player reaches max score (win_score); stops when returning to GAME_MENU or replaying.
+- Added handling_sound (controller) and processing_sound (model) following MVC pattern.
+- Modified processing_running to return mark_placed as 5th value.
+- Added prev_state and mark_placed tracking in the game loop.
