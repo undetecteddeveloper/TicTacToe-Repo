@@ -157,7 +157,7 @@ def handling_setting(events, field_rect, cb_rect, btn_rect):
 def handling_sound(prev_state, new_state, mark_placed, score_x, score_o, win_score):
     play_marking = mark_placed
     start_music  = (new_state == GAME_MENU and prev_state in (None, GAME_ACTION))
-    stop_music   = (new_state == GAME_ACTION and prev_state != GAME_ACTION)
+    stop_music   = (prev_state == GAME_MENU and new_state == GAME_RUNNING)
     play_winning = (new_state == GAME_ACTION and prev_state != GAME_ACTION
                     and (score_x >= win_score or score_o >= win_score))
     stop_winning = (prev_state == GAME_ACTION and new_state != GAME_ACTION)
